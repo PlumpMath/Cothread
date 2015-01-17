@@ -7,7 +7,6 @@
  **/
 #endregion
 
-using UnityEngine;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -51,6 +50,41 @@ namespace Cothreads {
 		}
 	}
 
+	public class CoHelper
+	{
+		public static Cothread StartCoroutine(IEnumerator routine)
+		{
+			return CothreadHub.Instance.StartCoroutine(routine);
+		}
+
+		public static Cothread StartCoroutine(uint ms, IEnumerator routine)
+		{
+			return CothreadHub.Instance.StartCoroutine(ms, routine);
+		}
+
+		public static IEnumerator StartThread(Action action)
+		{
+			return CothreadHub.Instance.StartThread(action);
+		}
+
+		public static IEnumerator Sleep(uint ms)
+		{
+			return CothreadHub.Instance.Sleep(ms);
+		}
+
+		public static Cothread StartOrders(params object[] ies)
+		{
+			return StartCoroutine(Orders(ies));
+		}
+
+		public static IEnumerator Orders(object[] ies)
+		{
+			foreach (var ie in ies)
+			{
+				yield return ie;
+			}
+		}
+	}
 
 	public class CothreadHub {
 		#region 属性定义
@@ -126,6 +160,26 @@ namespace Cothreads {
 			addTimeUp(ms, th.IE);
 			return th;
 		}
+
+		IEnumerator invoke(Action act)
+		{
+			act();
+			yield return null;
+		}
+
+		public Cothread Invoke(uint ms, Action act)
+		{
+			return StartCoroutine(ms, invoke(() => act()));
+		}
+		public Cothread Invoke<T>(uint ms, Action<T> act, T param)
+		{
+			return StartCoroutine(ms, invoke(() => act(param)));
+		}
+		public Cothread Invoke<T1, T2>(uint ms, Action<T1, T2> act, T1 param1, T2 param2)
+		{
+			return StartCoroutine(ms, invoke(() => act(param1, param2)));
+		}
+
 
 		public IEnumerator StartThread(Action action) {
 			IAsyncResult rs = action.BeginInvoke(delegate(IAsyncResult ar) {
@@ -304,7 +358,13 @@ namespace Cothreads {
 			} else if (ie.Current is Cothread) {
 				var th1 = (Cothread)ie.Current;
 				if (th1.Closed || !th1.ev.add(ie)) addCothread(ie);
-			} else addCothread(ie);
+			} else if (ie.Current is CothreadEvent)
+			{
+				var ev = (CothreadEvent)ie.Current;
+				if (!ev.Seted) ev.add(ie);
+				else addCothread(ie);
+			} 
+			else addCothread(ie);
 		}
 
 		#endregion
@@ -331,14 +391,17 @@ namespace Cothreads {
 				ok = false;
 				try {
 					ok = ie.MoveNext();
-				} catch (Exception err) {
+				} catch (Exception err)
+				{
+					ok = false;
 					CothreadHub.Log(err);
 				}
 				if (!ok)
 					yield break;
 
 				rss = null;
-				if (ie.Current is IEnumerable)
+				if (ie.Current is CothreadEvent) {}
+				else if (ie.Current is IEnumerable)
 					rss = callIEnumerable(ie.Current as IEnumerable, th);
 				else if (ie.Current is IEnumerator) 
 					rss = callIEnumerable(ie.Current as IEnumerator, th);
@@ -391,6 +454,16 @@ namespace Cothreads {
 			}
 		}
 
+		private Hashtable _locals;
+		public Hashtable Locals
+		{
+			get
+			{
+				if (_locals == null) _locals = new Hashtable();
+				return _locals;
+			}
+		}
+
 		public Cothread() {
 			Closed = false;
 		}
@@ -419,6 +492,11 @@ namespace Cothreads {
 		public bool CheckTimeout() {
 			return Timeout != null;
 		}
+
+		public void EndCallBack(Action<object> act)
+		{
+			ev.onSet += act;
+		}
 	}
 
 
@@ -429,6 +507,10 @@ namespace Cothreads {
 		private static object NULL = new object();
 		private List<IEnumerator> yields = new List<IEnumerator>();
 
+		public bool Seted
+		{
+			get { return Current != NULL; }
+		}
 
 		public CothreadEvent() {
 			Current = NULL;
@@ -478,7 +560,7 @@ namespace Cothreads {
 			return defaultValue;
 		}
 
-		public void Set(object v) {
+		public void Set(object v=null) {
 			Current = v;
 			if (yields.Count > 0) 
 				CothreadHub.Instance.addCothread(this);

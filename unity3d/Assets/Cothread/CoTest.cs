@@ -14,6 +14,7 @@ using System.Threading;
 using System.Diagnostics;
 using UnityEngine;
 
+using AssertDebug = System.Diagnostics.Debug;
 
 namespace Cothreads {
 	public class CothreadTestCase {
@@ -91,6 +92,10 @@ namespace Cothreads {
 				CothreadHub.Log("[testEvent2] error");
 			else
 				CothreadHub.Log("[testEvent2] ok");
+			ev.Clear();
+			hub.StartCoroutine(_testEvent2(ev));
+			yield return ev;
+			AssertDebug.Assert(ev.Get().Equals(1), "[testEvent2] yield event error!");
 		}
 		IEnumerator _testEvent2(CothreadEvent ev) {
 			yield return hub.Sleep(1000);

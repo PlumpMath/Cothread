@@ -73,6 +73,9 @@ public class UnityHub: CothreadHub {
 
 
 	#region 扩展支持u3d
+	public Cothread StartCothread(IEnumerator routine, MonoBehaviour mb) {
+		return StartCothread(routine, mb.gameObject);
+	}
 
 	public Cothread StartCothread(IEnumerator routine, GameObject owner) {
 		CothreadsBehaviour cb = owner.GetComponent<CothreadsBehaviour>();
@@ -128,11 +131,11 @@ public class UnityHub: CothreadHub {
 
 }
 
-public static class UnityExtensions {
-	public static Cothread StartCothread(this MonoBehaviour target, IEnumerator routine) {
-		return UnityHub.Instance.StartCothread(routine, target.gameObject);
-	}
-}
+//public static class UnityExtensions {
+//	public static Cothread StartCothread(this MonoBehaviour target, IEnumerator routine) {
+//		return UnityHub.Instance.StartCothread(routine, target.gameObject);
+//	}
+//}
 
 class CothreadsBehaviour : MonoBehaviour {
 	private HashSet<Cothread> threads = new HashSet<Cothread>();
