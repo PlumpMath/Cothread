@@ -1,4 +1,4 @@
-#region Header
+﻿#region Header
 /**
  *  Cothread for unity3d
  *  Author: seewind
@@ -7,7 +7,7 @@
  **/
 #endregion
 
-#if UNITY_PRO_LICENSE
+
 using System;
 using System.Collections;
 using System.Net;
@@ -64,7 +64,7 @@ namespace Cothreads {
 			var rs = sock.BeginConnect(host, port, hub.cb, hub.current);
 			if (!rs.IsCompleted)
 				yield return rs;
-			if (hub.CurrentCothread.CheckTimeout()) 
+			if (hub.CurrentCothread.IsTimeout(false)) 
 				Close();
 			else {
 				try {
@@ -90,7 +90,7 @@ namespace Cothreads {
 
 			//hub.Print("$(GetHashCode().ToString()) sock.EndSending .....")
 			int l;
-			if (hub.CurrentCothread.CheckTimeout()) {
+			if (hub.CurrentCothread.IsTimeout(false)) {
 				Close();
 				CothreadHub.Log(string.Format("[AsyncSocket.send]:{0} Send Timeout", GetHashCode()));
 				yield break;
@@ -129,7 +129,7 @@ namespace Cothreads {
 
 			if (!rs.IsCompleted)
 				yield return rs;
-			if (hub.CurrentCothread.CheckTimeout())
+			if (hub.CurrentCothread.IsTimeout(false))
 				Close();
 			else {
 				try {
@@ -141,7 +141,7 @@ namespace Cothreads {
 		}
 
 		//utf8 encoding
-		public IEnumerator RecvString(CothreadSocketRecvData recvData, CothreadResult result) {
+		public IEnumerator RecvString(CothreadSocketRecvData recvData, CothreadResult<string> result) {
 			if (!Connected)
 				yield break;
 			yield return Recv(recvData);
@@ -149,4 +149,4 @@ namespace Cothreads {
 		}
 	}
 }
-#endif
+

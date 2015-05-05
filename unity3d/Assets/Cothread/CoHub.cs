@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using Cothreads;
 
 public class CoHub: MonoBehaviour {
-	public UnityHub Hub { get { return (UnityHub)UnityHub.Instance; } }
+	public static UnityHub Hub { get { return (UnityHub)UnityHub.Instance; } }
 
     public void Start() {
     	UnityHub.Install(this);
@@ -131,11 +131,12 @@ public class UnityHub: CothreadHub {
 
 }
 
-//public static class UnityExtensions {
-//	public static Cothread StartCothread(this MonoBehaviour target, IEnumerator routine) {
-//		return UnityHub.Instance.StartCothread(routine, target.gameObject);
-//	}
-//}
+public static class UnityExtensions {
+	public static Cothread StartCothread<T>(this T target, IEnumerator routine) where T : MonoBehaviour
+	{
+		return UnityHub.Instance.StartCothread(routine, target.gameObject);
+	}
+}
 
 class CothreadsBehaviour : MonoBehaviour {
 	private HashSet<Cothread> threads = new HashSet<Cothread>();

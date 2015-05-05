@@ -26,16 +26,33 @@ namespace Cothreads {
 		}
 	}
 
-	public class CothreadTimeoutError : CothreadError {
-		public CothreadTimeoutError(string msg):base(msg) {
+	public class CothreadTimeoutError : CothreadError
+	{
+		public CothreadTimeout Timeout;
+		public CothreadTimeoutError(CothreadTimeout t):base("Timeout")
+		{
+			Timeout = t;
 		}
 	}
 
-	public class CothreadResult {
-			public object Result;
-		}
+	public sealed class CothreadResult<T>
+	{
+		public T Result;
+		public Exception Error=null;
 
-	public class YieldState {
+		public T GetResult(bool isThrowTimeout=false)
+		{
+			if (Error != null)
+			{
+				throw Error;
+			}
+			if (CothreadHub.Instance.CurrentCothread.IsTimeout(isThrowTimeout)) return default(T);
+			return Result;
+		}
+	}
+
+	public class YieldState 
+	{
 		public IEnumerator IE { get; set;} 
 		public uint WakeTime;
 		
@@ -62,6 +79,29 @@ namespace Cothreads {
 			return CothreadHub.Instance.StartCoroutine(ms, routine);
 		}
 
+		public static List<Cothread> StartCoroutines(List<IEnumerator> ies)
+		{
+			var rs = new List<Cothread>();
+			foreach (var ie in ies)
+			{
+				rs.Add(CothreadHub.Instance.StartCoroutine(ie));
+			}
+			return rs;
+		}
+
+		public static IEnumerator Joins(List<Cothread> threads)
+		{
+			foreach (var thread in threads)
+			{
+				yield return thread.Join();
+			}
+		}
+
+		public static void Joins(List<Cothread> threads, Action act)
+		{
+			StartCoroutine(Joins(threads)).EndCallBack(act);
+		}
+
 		public static IEnumerator StartThread(Action action)
 		{
 			return CothreadHub.Instance.StartThread(action);
@@ -72,18 +112,24 @@ namespace Cothreads {
 			return CothreadHub.Instance.Sleep(ms);
 		}
 
-		public static Cothread StartOrders(params object[] ies)
+		public static Cothread StartIEnumerators(params object[] ies)
 		{
-			return StartCoroutine(Orders(ies));
+			return StartCoroutine(yieldIEnumerators(ies));
 		}
 
-		public static IEnumerator Orders(object[] ies)
+		public static Cothread StartIEnumerators(List<object> ies)
+		{
+			return StartCoroutine(yieldIEnumerators(ies.ToArray()));
+		}
+
+		public static IEnumerator yieldIEnumerators(object[] ies)
 		{
 			foreach (var ie in ies)
 			{
 				yield return ie;
 			}
 		}
+
 	}
 
 	public class CothreadHub {
@@ -476,7 +522,14 @@ namespace Cothreads {
 			if (Closed) return;
 			Closed = true;
 			if (_ev != null) {
-				_ev.Set(this);
+				try
+				{
+					_ev.Set(this);
+				}
+				catch (Exception err)
+				{
+					CothreadHub.Log(err);
+				}
 				_ev = null;
 			}
 			CothreadHub.Instance.delCothread(IE);
@@ -489,13 +542,21 @@ namespace Cothreads {
 			return ev.Wait(ms);
 		}
 
-		public bool CheckTimeout() {
-			return Timeout != null;
+		public bool IsTimeout(bool isThrowTimeout)
+		{
+			var t = Timeout;
+			Timeout = null;
+			if (t != null)
+			{
+				if (isThrowTimeout) throw new CothreadTimeoutError(t);
+				return true;
+			}
+			return false;
 		}
 
-		public void EndCallBack(Action<object> act)
+		public void EndCallBack(Action act)
 		{
-			ev.onSet += act;
+			ev.onSet0 += act;
 		}
 	}
 
@@ -503,6 +564,7 @@ namespace Cothreads {
 	public class CothreadEvent: IEnumerator {
 		public object Current { get; set;}
 		public Action<object> onSet;
+		public Action onSet0;
 
 		private static object NULL = new object();
 		private List<IEnumerator> yields = new List<IEnumerator>();
@@ -514,6 +576,10 @@ namespace Cothreads {
 
 		public CothreadEvent() {
 			Current = NULL;
+		}
+
+		public CothreadEvent(object v) {
+			Current = v;
 		}
 
 		protected internal bool add(IEnumerator ie) {
@@ -565,6 +631,7 @@ namespace Cothreads {
 			if (yields.Count > 0) 
 				CothreadHub.Instance.addCothread(this);
 			if (onSet != null) onSet(v);
+			if (onSet0 != null) onSet0();
 		}
 	}
 
@@ -609,6 +676,7 @@ namespace Cothreads {
 		public void Start(uint ms) {
 			cancel = false;
 			var hub = CothreadHub.Instance;
+			hub.CurrentCothread.Timeout = null;
 			ie = hub.current;
 			TimeoutTime = ms;
 			startTime = DateTime.Now;
@@ -620,7 +688,7 @@ namespace Cothreads {
 			if (hub.CurrentCothread.Timeout == this)
 				hub.CurrentCothread.Timeout = null;
 			if (isThrow && Timeout) 
-				throw new CothreadTimeoutError("Timeout");
+				throw new CothreadTimeoutError(this);
 			cancel = true;
 		}
 

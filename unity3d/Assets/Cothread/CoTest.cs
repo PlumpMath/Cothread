@@ -31,9 +31,9 @@ namespace Cothreads {
 			hub.StartCoroutine(testEvent2());
 			hub.StartCoroutine(testCothread());
 			hub.StartCoroutine(testJoin());
-#if UNITY_PRO_LICENSE
+
 			testSock(count);
-#endif
+
 			hub.StartCoroutine(testU3d(count));
 			hub.StartCoroutine(testU3dStartCothread());
 		}
@@ -126,7 +126,7 @@ namespace Cothreads {
 
 
 
-#if UNITY_PRO_LICENSE
+
 		//socket
 		void testSock(int count) {
 			for (int i=0; i<count; i++) {
@@ -148,7 +148,7 @@ namespace Cothreads {
 			yield return sock.SendString("GET / HTTP/1.0\n\n");
 			//CothreadHub.Log(stri + "-Send ok");
 			var recvData = new CothreadSocketRecvData(2048);
-			var result = new CothreadResult();
+			var result = new CothreadResult<string>();
 
 			yield return hub.Sleep(1000);
 			yield return sock.RecvString(recvData, result);
@@ -165,7 +165,7 @@ namespace Cothreads {
 				sock.Close();
 			}
 		}
-#endif
+
 
 		IEnumerator testJoin() {
 			var timeout = CothreadTimeout.NewWithStart(1);
@@ -190,7 +190,7 @@ namespace Cothreads {
 			else
 				CothreadHub.Log("[testU3d] www ok: size:" + w1.text.Length.ToString());
 
-			var result = new CothreadResult();
+			var result = new CothreadResult<bool>();
 			var u1 = UnityHub.Active.StartCoroutine(_u3dCoroutine1(result));
 			yield return u1;
 			if (result.Result.Equals(true))
@@ -199,7 +199,7 @@ namespace Cothreads {
 				CothreadHub.Log("[testU3d]StartCoroutine error");
 		}
 
-		IEnumerator _u3dCoroutine1(CothreadResult result) {
+		IEnumerator _u3dCoroutine1(CothreadResult<bool> result) {
 			yield return new WaitForSeconds(1);
 			result.Result = true;
 		}
